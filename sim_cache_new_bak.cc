@@ -21,12 +21,6 @@ using namespace std;
 */
 
 
-struct Evicted_block{
-    unsigned long int evictedTagVal;
-    unsigned long int evictedindex;
-    char dirtyBitVal;
-};
-
 struct Level_config{
     unsigned long int numBlocks;
     unsigned long int numSets;
@@ -51,8 +45,6 @@ struct arr_cell_val
     unsigned long int RU;
     unsigned long int tagValue;
     char dirtyBit;
-    unsigned long int addr;//need to store address value for the current cell val
-
 };
 
 class Level{
@@ -184,7 +176,7 @@ class Level{
         }
 
 
-        bool checkForValidBitZero(Level &l, unsigned long int assoc, addr_attrib l_attrib, unsigned long int addr, char rw ){
+        bool checkForValidBitZero(Level &l, unsigned long int assoc, addr_attrib l_attrib, char rw ){
             
             unsigned long int j, assocRU= 0;
             for(j=0;j<assoc;j++){
@@ -212,7 +204,6 @@ class Level{
                     l.l_config.memTraffic+=1;
                     l.arrTagVal[l_attrib.index][j].tagValue = l_attrib.tag; //putting the tag in that cell
                     l.arrTagVal[l_attrib.index][j].valid_bit = 1; //change the valid bit since putting data
-                    l.arrTagVal[l_attrib.index][j].addr = addr; //storing the current address val to the cell to recalculate params
                     assocRU = l.arrTagVal[l_attrib.index][j].RU;
                     // cout<<"RU Val :"<<assocRU<<"\n";
                     computeNewLRU(l, assocRU, assoc, l_attrib.index);
@@ -226,79 +217,65 @@ class Level{
             return 0;
         }
 
+        void replaceTagVal(Level &l, unsigned long int assoc,addr_attrib l_attrib, char rw){
 
-      
 
-        Evicted_block replaceTagVal(Level &l_curr, unsigned long int assoc_curr,addr_attrib l_attrib,
-                            unsigned long int addr, char rw){
-
-            //char returnDirtyVal = '\0'; //initially clean
-            Evicted_block evictedBlock;
 
             unsigned long int evicted_block,evicted_block_index;
             unsigned long int j,assocRU;
             char evicted_block_dirty;
-            for(j=0;j<assoc_curr;j++)
+            for(j=0;j<assoc;j++)
             {
-                if(l_curr.arrTagVal[l_attrib.index][j].tagValue!=l_attrib.tag 
-                  &&l_curr.arrTagVal[l_attrib.index][j].valid_bit==1 
-                  && l_curr.arrTagVal[l_attrib.index][j].RU==assoc_curr-1)
+                // if(l.arrTagVal[l_attrib.index][j].tagValue!=l_attrib.tag 
+                //   &&l.arrTagVal[l_attrib.index][j].valid_bit==1 
+                //   && l.arrTagVal[l_attrib.index][j].RU==assoc-1)
                 // cout<<"Associativity :"<<assoc<<"\n";
-                // if(l_curr.arrTagVal[l_attrib.index][j].RU==(assoc_curr-1)) //(assoc-1 == 1)
+                if(l.arrTagVal[l_attrib.index][j].RU==(assoc-1)) //(assoc-1 == 1)
                 {
 
                     // cout<<"replacing : "<<j<<"\n";
                     // cout<<"Assoc RU val : "<<l.arrTagVal[l_attrib.index][j].RU;
-                    evicted_block=l_curr.arrTagVal[l_attrib.index][j].tagValue;
+                    evicted_block=l.arrTagVal[l_attrib.index][j].tagValue;
                     evicted_block_index=l_attrib.index;
-                    evicted_block_dirty=l_curr.arrTagVal[l_attrib.index][j].dirtyBit;
-
-                    evictedBlock.evictedTagVal = l_curr.arrTagVal[l_attrib.index][j].tagValue;
-                    evictedBlock.evictedTagVal = l_attrib.index;
-                    evictedBlock.evictedTagVal = l_curr.arrTagVal[l_attrib.index][j].dirtyBit;
-
+                    evicted_block_dirty=l.arrTagVal[l_attrib.index][j].dirtyBit;
+                    
                     //chceking for a dirty block
                     if(evicted_block_dirty=='D') 
                     {
-                        l_curr.l_config.memTraffic+=1;
-                        l_curr.l_config.L2_WBMem+=1;
-
+                        l.l_config.memTraffic+=1;
+                        l.l_config.L2_WBMem+=1;
                     }
                     
                     //for read request
                     if(rw=='r')
                     {
-                        l_curr.l_config.readMisses+=1;
-                        l_curr.l_config.numReads+=1;
-                        l_curr.arrTagVal[l_attrib.index][j].dirtyBit='\0';
+                        l.l_config.readMisses+=1;
+                        l.l_config.numReads+=1;
+                        l.arrTagVal[l_attrib.index][j].dirtyBit='\0';
                     }
                     else // for write request
                     {   
-                        l_curr.l_config.writeMisses+=1;
-                        l_curr.l_config.numWrites+=1;
-                        l_curr.arrTagVal[l_attrib.index][j].dirtyBit='D';
+                        l.l_config.writeMisses+=1;
+                        l.l_config.numWrites+=1;
+                        l.arrTagVal[l_attrib.index][j].dirtyBit='D';
                     }
                     
-                    l_curr.arrTagVal[l_attrib.index][j].tagValue= l_attrib.tag;
-                    l_curr.arrTagVal[l_attrib.index][j].addr = addr;//storing the address value to the cell for recalculation of params
-                    l_curr.l_config.memTraffic+=1;
-                    assocRU=l_curr.arrTagVal[l_attrib.index][j].RU;
-                    computeNewLRU(l_curr, assocRU,assoc_curr, l_attrib.index);
+                    l.arrTagVal[l_attrib.index][j].tagValue= l_attrib.tag;
+                    l.l_config.memTraffic+=1;
+                    assocRU=l.arrTagVal[l_attrib.index][j].RU;
+                    computeNewLRU(l, assocRU,assoc, l_attrib.index);
                     break;
                 }
             }
 
-            return evictedBlock;
 
         }
 
         
     //performing read operation on L1
         void updateLevel(Level &l1, Level &l2, unsigned long int l1_assoc, addr_attrib l1_attrib,
-        unsigned l2_assoc, addr_attrib l2_attrib,unsigned long int addr, char rw){
+        unsigned l2_assoc, addr_attrib l2_attrib, char rw){
             
-            Evicted_block evictedBlockVals;
-
             bool matchL2=0;
 
             if(rw == 'r'){
@@ -311,14 +288,13 @@ class Level{
                     // cout<< "No Match Tag :"<<hex<<l1_attrib.tag<<"\n";
 
                      //reflect the L2 to L1
-                    bool validBitStat1 = l1.checkForValidBitZero(l1, l1_assoc, l1_attrib, addr, rw);
+                    bool validBitStat1 = l1.checkForValidBitZero(l1, l1_assoc, l1_attrib, rw);
 
                     if(validBitStat1 == 0){ //we replace the existing tag value
                         // cout<< "replacing existing tag with : "<<hex<<l1_attrib.tag<<"\n";
                         // cout<<"L1 RU 0 :"<<l1.arrTagVal[l1_attrib.index][0].RU<<"\n";
                         // cout<<"L1 RU 1 :"<<l1.arrTagVal[l1_attrib.index][1].RU<<"\n";
-                        evictedBlockVals = replaceTagVal(l1, l1_assoc, l1_attrib, addr, rw); //evicting when miss  based on LRU 
-                       // cout<< "Evicted Block Vals :"<<hex<<evictedBlockVals.evictedTagVal<<" "<<evictedBlockVals.evictedindex<<" "<<evictedBlockVals.dirtyBitVal<<"\n";
+                        replaceTagVal(l1, l1_assoc, l1_attrib, rw); //evicting when miss  based on LRU 
 
                     }
                 
@@ -329,11 +305,11 @@ class Level{
                         if(!matchL2){
 
                             //check for the valid bit
-                            bool validBitStat2 = l2.checkForValidBitZero(l2, l2_assoc, l2_attrib, addr, rw);
+                            bool validBitStat2 = l2.checkForValidBitZero(l2, l2_assoc, l2_attrib, rw);
 
                             //valid bit zero and tag has been added to the level assoc
                             if(validBitStat2 == 0){
-                                replaceTagVal(l2, l2_assoc, l2_attrib, addr, rw); //evicting when miss based on LRU 
+                                replaceTagVal(l2, l2_assoc, l2_attrib, rw); //evicting when miss based on LRU 
 
                                 //check for dirty bit
 
@@ -356,12 +332,12 @@ class Level{
 
                 if(!matchL1){
 
-                    bool validBitStat1 = l1.checkForValidBitZero(l1, l1_assoc, l1_attrib, addr, rw);
+                    bool validBitStat1 = l1.checkForValidBitZero(l1, l1_assoc, l1_attrib, rw);
                     if(validBitStat1 == 0){ //we replace the existing tag value
                         // cout<< "replacing existing tag with : "<<hex<<l1_attrib.tag<<"\n";
                         // cout<<"L1 RU 0 :"<<l1.arrTagVal[l1_attrib.index][0].RU<<"\n";
                         // cout<<"L1 RU 1 :"<<l1.arrTagVal[l1_attrib.index][1].RU<<"\n";
-                        replaceTagVal(l1, l1_assoc, l1_attrib, addr, rw); //evicting when miss  based on LRU 
+                        replaceTagVal(l1, l1_assoc, l1_attrib, rw); //evicting when miss  based on LRU 
 
                     }
                  ///go to L2 if size of L2 not 0
@@ -370,14 +346,14 @@ class Level{
                         matchL2 = l2.searchLevelForTagMatch(l2, l2_assoc, l2_attrib, rw);
 
 
-                    if(!matchL2){
+                        if(!matchL2){
 
                         //check for the valid bit
-                        bool validBitStat2 = l2.checkForValidBitZero(l2, l2_assoc, l2_attrib, addr, rw);
+                        bool validBitStat2 = l2.checkForValidBitZero(l2, l2_assoc, l2_attrib, rw);
 
                         //valid bit zero and tag has been added to the level assoc
                         if(validBitStat2 == 0){
-                                replaceTagVal(l2, l2_assoc, l2_attrib, addr, rw); //evicting when miss based on LRU 
+                                replaceTagVal(l2, l2_assoc, l2_attrib, rw); //evicting when miss based on LRU 
 
 
                             //check bor dirty bit
@@ -555,7 +531,7 @@ int main(int argc, char* argv[]){
        }
         
             
-        l1.updateLevel(l1, l2, params.l1_assoc, addr_result1, params.l2_assoc, addr_result2, addr, rw);
+        l1.updateLevel(l1, l2, params.l1_assoc, addr_result1, params.l2_assoc, addr_result2, rw);
            
         
 
@@ -571,7 +547,7 @@ int main(int argc, char* argv[]){
            cout<<hex<<l1.arrTagVal[i][j].tagValue;
         //    cout<<" Valit bit :"<<l1.arrTagVal[i][j].valid_bit;
 			if(l1.arrTagVal[i][j].dirtyBit == 'D')
-				cout<<" D"<<"  ";
+				cout<<"D"<<"  ";
 			else
 				cout<<" "<<"  ";
         }
@@ -591,7 +567,7 @@ int main(int argc, char* argv[]){
            cout<<hex<<l2.arrTagVal[i][j].tagValue;
         //    cout<<" Valit bit :"<<l2.arrTagVal[i][j].valid_bit;
 			if(l2.arrTagVal[i][j].dirtyBit == 'D')
-				cout<<" D"<<"  ";
+				cout<<"D"<<"  ";
 			else
 				cout<<" "<<"  ";
         }
@@ -605,23 +581,5 @@ int main(int argc, char* argv[]){
     cout<<"===== Simulation Results ====="<<endl;
     cout<<"  a.  number of L1 hits:  "<<dec<<l1.l_config.readHits<<endl;
     cout<<"  a.  number of L2 hits:  "<<dec<<l2.l_config.readHits<<endl;
-
-    // to print simulaiton results
-    cout<<"===== Simulation Results ====="<<endl;
-    cout<<"  a.  number of L1 reads:                    "<<dec<<l1.l_config.numReads<<endl;
-    cout<<"  b.  number of L1 read misses:              "<<dec<<l1.l_config.readMisses<<endl;
-    cout<<"  c.  number of L1 writes:                   "<<dec<<l1.l_config.numWrites<<endl;
-    cout<<"  d.  number of L1 write misses:             "<<dec<<l1.l_config.writeMisses<<endl;
-    cout<<"  e.  number of swap requests:               "<<dec<<VC.l_config.swapRequests<<endl;
-    //cout<<"  f.  swap request rate:                     "<<fixed<<setprecision(4)<<SRR<<endl;
-    //cout<<"  g.  number of swaps:                       "<<dec<<VC.l_config.swaps<<endl;
-    //cout<<"  h.  combined L1+VC miss rate:              "<<fixed<<setprecision(4)<<L1_missRate<<endl;
-    cout<<"  i.  number writebacks from L1/VC:          "<<dec<<l1.l_config.L1_WBMem<<endl;
-    cout<<"  j.  number of L2 reads:                    "<<dec<<l2.l_config.numReads<<endl;
-    cout<<"  k.  number of L2 read misses:              "<<dec<<l2.l_config.readMisses<<endl;
-    cout<<"  l.  number of L2 writes:                   "<<dec<<l2.l_config.numWrites<<endl;
-    cout<<"  m.  number of L2 write misses:             "<<dec<<l2.l_config.writeMisses<<endl;
-   // cout<<"  n.  L2 miss rate:                          "<<fixed<<setprecision(4)<<L2_missRate<<endl;
-    cout<<"  o.  number of writebacks from L2:          "<<dec<<l2.l_config.L2_WBMem<<endl;
     
 }
